@@ -70,12 +70,16 @@ fastapi_backend-main/
 │   │       │   ├── routers.py       # Endpoints /categorias
 │   │       │   ├── schemas.py       # Modelos Pydantic
 │   │       │   └── services.py      # Lógica de negocio + datos en memoria
-│   │       └── producto/
-│   │           ├── routers.py       # Endpoints /productos
-│   │           ├── schemas.py       # Modelos Pydantic + ProductoStockResponse
-│   │           └── services.py      # Lógica de negocio + alerta de stock
+│   │       ├── producto/
+│   │       │   ├── routers.py       # Endpoints /productos
+│   │       │   ├── schemas.py       # Modelos Pydantic + ProductoStockResponse
+│   │       │   └── services.py      # Lógica de negocio + alerta de stock
+│   │       └── clientes/            # Módulo nuevo — Paso 2
+│   │           ├── router.py        # Endpoints /clientes + filtros avanzados
+│   │           ├── schemas.py       # Modelos Pydantic con validaciones estrictas
+│   │           └── service.py       # Lógica de negocio + reglas de acceso
 │   └── tests/
-│       └── test_api.http            # 13 casos de prueba (VS Code REST Client)
+│       └── test_api.http            # Casos de prueba (VS Code REST Client)
 │
 ├── u_01/                            # Ejercicios progresivos
 │   ├── u1_ej1/                      # GET básico, respuestas JSON
@@ -105,19 +109,19 @@ HTTP Request
 │  ROUTERS  (routers.py)                   │
 │  Endpoints, status codes, validación     │
 │  de Path/Query params, manejo de 404     │
-├─���────────────────────────────────────────┤
+├──────────────────────────────────────────┤
 │  SCHEMAS  (schemas.py)                   │
 │  Modelos Pydantic: Base → Create, Read,  │
 │  Update. Validación automática (422)     │
-├────────────────────────────────────���─────┤
+├──────────────────────────────────────────┤
 │  SERVICES (services.py)                  │
 │  Lógica de negocio, CRUD,               │
 │  almacenamiento en listas en memoria     │
-└─────��───────────────────────────���────────┘
+└──────────────────────────────────────────┘
 ```
 
 - **Factory pattern**: `main.py` → `create_app()` registra los routers
-- **Módulos independientes**: categoria y producto no tienen dependencias cruzadas
+- **Módulos independientes**: categoria, producto y clientes no tienen dependencias cruzadas
 - **Flujo unidireccional**: Router → Service (nunca al revés)
 - **Schemas compartidos** entre capas como contratos de datos
 
@@ -146,9 +150,31 @@ Para un análisis completo con diagramas de flujo de requests, grafo de dependen
 | PUT    | `/productos/{id}/desactivar`     | 200    | Borrado lógico         |
 | GET    | `/productos/{id}/stock`          | 200    | Estado de stock        |
 
+### Clientes
+
+| Método | Endpoint                         | Status | Descripción                        |
+|--------|----------------------------------|--------|------------------------------------|
+| POST   | `/clientes/`                     | 201    | Crear cliente                      |
+| GET    | `/clientes/`                     | 200    | Listar con filtros avanzados       |
+| GET    | `/clientes/{id}`                 | 200    | Detalle por ID (solo activos)      |
+
+#### Filtros avanzados en `/clientes/`
+
+| Parámetro | Tipo   | Descripción                              |
+|-----------|--------|------------------------------------------|
+| `nombre`  | string | Búsqueda parcial por nombre              |
+| `email`   | string | Búsqueda parcial por email               |
+| `activo`  | bool   | Filtrar por estado activo/inactivo       |
+
+```
+GET /clientes?nombre=juan
+GET /clientes?activo=true
+GET /clientes?nombre=juan&activo=true
+```
+
 ### Paginación
 
-Los endpoints de listado aceptan query parameters:
+Los endpoints de listado de categorías y productos aceptan query parameters:
 
 | Parámetro | Tipo | Default | Restricción |
 |-----------|------|---------|-------------|
@@ -200,6 +226,23 @@ GET /productos/?skip=0&limit=5
 | stock        | int    | Mayor o igual a 0                  |
 | stock_minimo | int    | Mayor o igual a 0                  |
 | activo       | bool   | Opcional, default: `true`          |
+
+### Cliente
+
+```json
+{
+  "id": 1,
+  "nombre": "Juan Pérez",
+  "email": "juan@gmail.com",
+  "activo": true
+}
+```
+
+| Campo   | Tipo    | Validación                                        |
+|---------|---------|---------------------------------------------------|
+| nombre  | string  | Mínimo 2, máximo 100 caracteres, sin números      |
+| email   | string  | Formato email válido (`EmailStr`), único          |
+| activo  | bool    | Opcional, default: `true`                         |
 
 ### Respuesta de Stock
 
@@ -267,6 +310,42 @@ curl -X POST http://127.0.0.1:8000/productos/ \
 }
 ```
 
+### Crear un cliente
+
+```bash
+curl -X POST http://127.0.0.1:8000/clientes/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Juan Pérez",
+    "email": "juan@gmail.com",
+    "activo": true
+  }'
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "id": 4,
+  "nombre": "Juan Pérez",
+  "email": "juan@gmail.com",
+  "activo": true
+}
+```
+
+### Filtrar clientes
+
+```bash
+# Por nombre
+curl http://127.0.0.1:8000/clientes?nombre=juan
+
+# Solo activos
+curl http://127.0.0.1:8000/clientes?activo=true
+
+# Combinado
+curl http://127.0.0.1:8000/clientes?nombre=juan&activo=true
+```
+
 ### Consultar alerta de stock
 
 ```bash
@@ -313,6 +392,22 @@ curl -X PUT http://127.0.0.1:8000/productos/1/desactivar
 }
 ```
 
+### 403 — Acceso prohibido (cliente inactivo)
+
+```json
+{
+  "detail": "El cliente está inactivo y no puede ser consultado"
+}
+```
+
+### 400 — Regla de negocio violada
+
+```json
+{
+  "detail": "Ya existe un cliente con ese email"
+}
+```
+
 ### 422 — Error de validación
 
 Ejemplo: crear un producto con categoría inválida y precio negativo.
@@ -340,32 +435,20 @@ Los tests están en formato `.http` (compatible con la extensión [REST Client](
 u1_ej_8_integrador/tests/test_api.http
 ```
 
-Incluye 13 casos de prueba que cubren:
-
-1. Listar categorías
-2. Crear categoría
-3. Detalle de categoría
-4. Actualizar categoría (reemplazo total)
-5. Desactivar categoría
-6. Crear producto
-7. Listar productos con paginación
-8. Detalle de producto
-9. Actualizar producto
-10. Consultar alerta de stock
-11. Desactivar producto
-12. Producto inexistente (404)
-13. Producto inválido (422)
-
-Para ejecutarlos: abrir el archivo en VS Code con REST Client instalado y hacer click en "Send Request" sobre cada bloque.
-
 ## Datos Iniciales
 
-Al iniciar el servidor, la API tiene precargadas dos categorías:
+Al iniciar el servidor, la API tiene precargadas dos categorías y tres clientes:
 
 | ID | Código  | Descripción          | Activo |
 |----|---------|----------------------|--------|
 | 1  | MUE-01  | Muebles de Oficina   | true   |
 | 2  | ELE-02  | Electrónica          | true   |
+
+| ID | Nombre         | Email               | Activo |
+|----|----------------|---------------------|--------|
+| 1  | Juan Pérez     | juan@gmail.com      | true   |
+| 2  | María López    | maria@gmail.com     | false  |
+| 3  | Carlos García  | carlos@gmail.com    | true   |
 
 La lista de productos arranca vacía.
 
