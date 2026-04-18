@@ -444,11 +444,11 @@ Al iniciar el servidor, la API tiene precargadas dos categorías y tres clientes
 | 1  | MUE-01  | Muebles de Oficina   | true   |
 | 2  | ELE-02  | Electrónica          | true   |
 
-| ID | Nombre         | Email               | Activo |
-|----|----------------|---------------------|--------|
-| 1  | Juan Pérez     | juan@gmail.com      | true   |
-| 2  | María López    | maria@gmail.com     | false  |
-| 3  | Carlos García  | carlos@gmail.com    | true   |
+| ID | Nombre             | Email             | Activo |
+|----|--------------------|-------------------|--------|
+| 1  | Pepe Argento       | pepe@gmail.com    | true   |
+| 2  | Luz Marina         | luz@gmail.com     | false  |
+| 3  | Juan Roman Riquelme| juan@gmail.com    | true   |
 
 La lista de productos arranca vacía.
 
